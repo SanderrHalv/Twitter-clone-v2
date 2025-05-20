@@ -1,0 +1,175 @@
+/* Base styles */
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background-color: #f5f8fa;
+}
+
+/* Header */
+.header {
+    background-color: #1da1f2;
+    padding: 1em;
+}
+.header h1 {
+    margin: 0;
+    color: #ffffff;
+    text-align: center;
+}
+
+/* Tab navigation bar */
+.tab-bar {
+    background-color: #ffffff;
+    border-bottom: 1px solid #cccccc;
+    text-align: center;
+}
+.tab-bar .tab {
+    display: inline-block;
+    padding: 0.5em 1em;
+    margin: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 1em;
+    color: #333333;
+}
+.tab-bar .tab.active {
+    border-bottom: 3px solid #1da1f2;
+    font-weight: bold;
+}
+
+/* Tab content sections */
+.tab-content {
+    display: none;
+}
+.tab-content.active {
+    display: block;
+    padding: 1em;
+}
+
+/* Tweet & Account forms */
+.tweet-form,
+.account-form {
+    background-color: #ffffff;
+    border: 1px solid #cccccc;
+    border-radius: 5px;
+    padding: 1em;
+    margin: 1em auto;
+    max-width: 600px;
+}
+.tweet-form h2,
+.account-form h2 {
+    margin-top: 0;
+}
+
+/* Form fields */
+.form-group {
+    margin-bottom: 0.75em;
+}
+.form-group label {
+    display: block;
+    margin-bottom: 0.25em;
+    font-weight: 500;
+}
+.form-group input,
+.form-group textarea,
+textarea {
+    width: 100%;
+    padding: 0.5em;
+    border: 1px solid #cccccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+.form-group input:focus,
+.form-group textarea:focus,
+textarea:focus {
+    outline: none;
+    border-color: #1da1f2;
+}
+
+/* Search containers */
+.search-container {
+    max-width: 600px;
+    margin: 0 auto 1em;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5em;
+    justify-content: center;
+}
+.search-container input {
+    flex: 1;
+    min-width: 150px;
+    padding: 0.5em;
+    border: 1px solid #cccccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+.search-container input:focus {
+    outline: none;
+    border-color: #1da1f2;
+}
+
+/* Buttons (default) */
+button {
+    background-color: #1da1f2;
+    color: #ffffff;
+    border: none;
+    border-radius: 4px;
+    padding: 0.5em 1em;
+    cursor: pointer;
+    font-size: 1em;
+}
+button:hover {
+    background-color: #0c80d3;
+}
+/* Action buttons (Edit/Delete) */
+.action-btn {
+    background-color: #e0e0e0;
+    color: #333333;
+    padding: 0.25em 0.5em;
+    font-size: 0.9em;
+}
+.action-btn:hover {
+    background-color: #cccccc;
+}
+
+/* Tweet & Account list items */
+.tweet {
+    background-color: #ffffff;
+    border: 1px solid #cccccc;
+    border-radius: 5px;
+    padding: 1em;
+    margin: 0.5em auto;
+    max-width: 600px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+.tweet-header {
+    font-weight: bold;
+    margin-bottom: 0.5em;
+}
+.tweet-content {
+    margin-bottom: 0.5em;
+}
+.tweet-content p {
+    margin: 0.25em 0;
+}
+.edit-form {
+    display: none;
+    margin-bottom: 0.5em;
+}
+.edit-form textarea {
+    display: block;
+    width: 100%;
+    padding: 0.5em;
+    border: 1px solid #cccccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+    margin-bottom: 0.5em;
+}
+.edit-form textarea:focus {
+    outline: none;
+    border-color: #1da1f2;
+}
+/* .tweet-actions inherits default styling (left-aligned) */
+.tweet-actions {
+    /* No additional styling needed for actions container */
+}
