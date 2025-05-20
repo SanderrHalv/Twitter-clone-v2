@@ -105,7 +105,7 @@ async function handleLogin(e) {
   const username = document.getElementById('login-username').value;
   const password = document.getElementById('login-password').value;
 
-  const resp = await fetch(`${API_BASE_URL}/token`, {
+  const resp = await fetch(`${API_BASE_URL}/accounts/`, {
     method:  'POST',
     headers: {'Content-Type': 'application/x-www-form-urlencoded'},
     body:    `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`
@@ -130,7 +130,7 @@ async function handleRegister(e) {
   const email    = document.getElementById('register-email').value;
   const password = document.getElementById('register-password').value;
 
-  const resp = await fetch(`${API_BASE_URL}/users/`, {
+  const resp = await fetch(`${API_BASE_URL}/accounts/`, {
     method:  'POST',
     headers: {'Content-Type': 'application/json'},
     body:    JSON.stringify({username, email, password})
@@ -149,7 +149,7 @@ async function handleRegister(e) {
 // ----------------- USER INFO -----------------
 
 async function getCurrentUser() {
-  const resp = await fetch(`${API_BASE_URL}/users/me`, {
+  const resp = await fetch(`${API_BASE_URL}/accounts/me`, {
     headers: {'Authorization': `Bearer ${authToken}`}
   });
   if (!resp.ok) throw new Error();
@@ -217,7 +217,7 @@ async function postTweet() {
 // ----------------- SUGGESTIONS -----------------
 
 async function fetchUserSuggestions() {
-  const resp = await fetch(`${API_BASE_URL}/users/`, {
+  const resp = await fetch(`${API_BASE_URL}/accounts/`, {
     headers: {'Authorization': `Bearer ${authToken}`}
   });
   if (!resp.ok) return;
