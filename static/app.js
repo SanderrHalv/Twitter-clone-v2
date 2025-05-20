@@ -1,4 +1,4 @@
-const API_BASE_URL = 'https://twitter-clone-v2.onrender.com';
+const API_BASE_URL = window.location.origin + '/api';
 
 // Token storage
 let authToken = localStorage.getItem('twitter_clone_token');
