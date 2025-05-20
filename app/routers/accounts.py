@@ -1,43 +1,65 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import timedelta
 from sqlalchemy.orm import Session
-from app import crud, schemas
-from app.database import SessionLocal
+from passlib.context import CryptContext
+from jose import jwt
 
-router = APIRouter(prefix="/accounts", tags=["Accounts"])
+from app.database import get_db
+from app.models import Account, AccountCreate, AccountOut
+from app.utils.settings import settings
+from app.utils.auth import get_current_user
+import logging
 
-# Dependency to get DB session
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+router = APIRouter(
+    prefix="/accounts",
+    tags=["accounts"],
+)
 
-@router.post("/", response_model=schemas.Account)
-def create_account(account: schemas.AccountCreate, db: Session = Depends(get_db)):
-    db_account = crud.get_account_by_username(db, username=account.username)
-    if db_account:
-        raise HTTPException(status_code=400, detail="Username already registered")
-    
-    db_email = crud.get_account_by_email(db, email=account.email)
-    if db_email:
-        raise HTTPException(status_code=400, detail="Email already registered")
-    
-    return crud.create_account(db=db, account=account)
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-@router.get("/", response_model=list[schemas.Account])
-def list_accounts(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    accounts = crud.get_accounts(db, skip=skip, limit=limit)
-    return accounts
+@router.post("/", response_model=AccountOut, status_code=status.HTTP_201_CREATED)
+def register_account(payload: AccountCreate, db: Session = Depends(get_db)):
+    """
+    Register a new user account. Hashes password and stores user.
+    """
+    # Check for existing username or email
+    if db.query(Account).filter((Account.username == payload.username) | (Account.email == payload.email)).first():
+        logging.warning(f"Registration attempt with existing username/email: {payload.username}/{payload.email}")
+        raise HTTPException(status_code=400, detail="Username or email already registered")
 
-@router.get("/{account_id}", response_model=schemas.Account)
-def get_account(account_id: int, db: Session = Depends(get_db)):
-    db_account = crud.get_account_by_id(db, account_id=account_id)
-    if db_account is None:
-        raise HTTPException(status_code=404, detail="Account not found")
-    return db_account
+    hashed_pw = pwd_context.hash(payload.password)
+    db_user = Account(username=payload.username, email=payload.email, hashed_password=hashed_pw)
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
 
-@router.get("/search/", response_model=list[schemas.Account])
-def search_accounts(query: str, db: Session = Depends(get_db)):
-    accounts = crud.search_accounts(db, query=query)
-    return accounts
+    logging.info(f"New user registered: {db_user.username}")
+    return db_user
+
+@router.post("/login")
+def login_account(payload: AccountCreate, db: Session = Depends(get_db)):
+    """
+    Authenticate user and return a JWT token.
+    """
+    user = db.query(Account).filter(Account.username == payload.username).first()
+    if not user or not pwd_context.verify(payload.password, user.hashed_password):
+        logging.warning(f"Failed login attempt for user: {payload.username}")
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    # Create JWT token with expiry
+    access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
+    to_encode = {"sub": str(user.id)}
+    expire = settings.datetime.utcnow() + access_token_expires
+    to_encode.update({"exp": expire})
+    token = jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
+
+    logging.info(f"User logged in: {user.username}")
+    return {"access_token": token, "token_type": "bearer"}
+
+@router.get("/me", response_model=AccountOut)
+def read_current_user(user=Depends(get_current_user)):
+    """
+    Get the profile of the current authenticated user.
+    """
+    logging.debug(f"Profile viewed for user: {user.username}")
+    return user

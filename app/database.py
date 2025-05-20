@@ -1,33 +1,46 @@
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
-import os
-from dotenv import load_dotenv
-import traceback
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+from app.utils.settings import settings  # load DATABASE_URL from .env
 
-# Load environment variables
-load_dotenv()
-DATABASE_URL = os.getenv("DATABASE_URL")
+# ----------------------------------------------------------------
+# ENGINE & BASE
+# ----------------------------------------------------------------
+# Create the SQLAlchemy engine using the DATABASE_URL from settings.
+# echo=True can be toggled for SQL logging; disable in prod for performance.
+engine = create_engine(
+    settings.database_url,
+    pool_pre_ping=True,      # checks connections before using them
+    future=True              # use 2.0 style API
+)
 
-print("🔌 DATABASE_URL from .env:", DATABASE_URL)
-
-if not DATABASE_URL:
-    raise ValueError("DATABASE_URL not found in environment variables")
-
-try:
-    # Create engine with echo=True to see SQL queries for debugging
-    engine = create_engine(DATABASE_URL, echo=True)
-    
-    # Test connection
-    connection = engine.connect()
-    connection.close()
-    print("✅ Database connection successful!")
-except Exception as e:
-    print(f"❌ Database connection error: {str(e)}")
-    print(traceback.format_exc())
-    raise
-
-# Create session factory
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# Create base class for models
+# Base class for ORM models; models should inherit from this
 Base = declarative_base()
+
+# ----------------------------------------------------------------
+# SESSION FACTORY
+# ----------------------------------------------------------------
+# sessionmaker factory bound to the engine; expire_on_commit=False prevents
+# attributes from being expired after commit, which helps when returning ORM
+# objects from your endpoints.
+SessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=engine,
+    expire_on_commit=False,
+    class_=sessionmaker
+)
+
+# ----------------------------------------------------------------
+# DEPENDENCY
+# ----------------------------------------------------------------
+def get_db():
+    """
+    FastAPI dependency that yields a database session and ensures it is closed
+    after the request finishes (regardless of exceptions).
+    """
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
