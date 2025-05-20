@@ -3,83 +3,75 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
-from app.database import Base, engine                 # SQLAlchemy Base & engine for DB setup
-from app import models                                 # ensure models are registered before table creation
-from app.routers import accounts, tweets                # core account & tweet endpoints
-from app.cache import init_cache, close_cache           # Redis cache init/teardown
-from app.like_batcher import like_batcher               # background batcher for likes
-from app.logging_config import setup_logging            # structured logging setup
+from app.database import engine             # bring in engine definition only
+from app import models                      # register ORM models (no create_all here)
+from app.routers import accounts, tweets
+from app.cache import init_cache, close_cache
+from app.like_batcher import like_batcher
+from app.logging_config import setup_logging
 
 # ----------------------------------------------------------------
-# DATABASE MIGRATIONS
+# LOGGING SETUP
 # ----------------------------------------------------------------
-# Automatically create any missing tables on startup.
-# This ensures your new DB-cache and like-batcher can use the same schema.
-models.Base.metadata.create_all(bind=engine)
-
-# ----------------------------------------------------------------
-# LOGGING
-# ----------------------------------------------------------------
-# Initialize structured logging (JSON format, request tracing, etc.)
-# before the app is instantiated so all logs—including startup—
-# use the correct handlers and format.
+# Initialize structured logging before anything else
 setup_logging()
 
 # ----------------------------------------------------------------
-# FASTAPI APP SETUP
+# FASTAPI APP INITIALIZATION
 # ----------------------------------------------------------------
 app = FastAPI(title="Twitter Clone API with A2 enhancements")
 
-# Compress large responses to save bandwidth.
-# Only responses >1 KB are gzipped to avoid overhead on small payloads.
+# Compress large responses (>1KB) to save bandwidth
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-# Enable CORS for development/demo; tighten to specific origins in production.
+# Allow CORS for all origins (restrict in production)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],      # TODO: restrict to your front-end domain
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Register your routers for account & tweet functionality
-app.include_router(accounts.router)  # register /accounts/*
-app.include_router(tweets.router)    # register /tweets/*
+# Mount routers
+app.include_router(accounts.router)  # /accounts endpoints
+app.include_router(tweets.router)    # /tweets endpoints
 
 # ----------------------------------------------------------------
-# LIFECYCLE EVENTS
+# LIFECYCLE: STARTUP & SHUTDOWN
 # ----------------------------------------------------------------
 @app.on_event("startup")
 async def on_startup():
-    # Initialize the Redis client pool and any DB-cache prep
+    # 1) Ensure DB tables exist (moved here so import never triggers a DB call)
+    models.Base.metadata.create_all(bind=engine)
+    logging.info("Database tables created/verified on startup")
+
+    # 2) Initialize Redis cache
     await init_cache()
     logging.info("Redis cache initialized")
 
-    # Start background like-batcher thread/task for batching like writes
+    # 3) Start like-batcher background task
     app.state.like_batcher = like_batcher
     like_batcher.start()
     logging.info("Like-batcher started")
 
 @app.on_event("shutdown")
 async def on_shutdown():
-    # Flush any pending like events to the DB so none are lost
+    # Flush any pending likes
     await app.state.like_batcher.flush()
-    logging.info("Flushed remaining likes on shutdown")
+    logging.info("Flushed batched likes on shutdown")
 
-    # Gracefully close Redis connections
+    # Close Redis connections
     await close_cache()
     logging.info("Redis cache connection closed")
 
 # ----------------------------------------------------------------
-# BASIC ENDPOINTS
+# SIMPLE ENDPOINTS
 # ----------------------------------------------------------------
 @app.get("/")
 def read_root():
-    # Simple root message for sanity checks
     return {"message": "Welcome to the Twitter Clone API"}
 
 @app.get("/health")
 def health_check():
-    # Health-check endpoint for load balancer / orchestrator
     return {"status": "ok"}

@@ -1,26 +1,27 @@
-import aioredis
-from app.utils.settings import settings  # load Redis URL and other configs
+import redis.asyncio as aioredis               # use asyncio client from redis-py
+from app.utils.settings import settings       # load Redis URL and other configs
 
 # Global Redis client reference
-redis = None
+redis_client: aioredis.Redis | None = None
 
 async def init_cache():
     """
-    Initialize the Redis connection pool using aioredis.
+    Initialize the Redis connection pool using redis.asyncio.
     Called on application startup before handling requests.
     """
-    global redis
-    redis = await aioredis.from_url(
+    global redis_client
+    redis_client = aioredis.from_url(
         settings.redis_url,
         encoding="utf-8",
         decode_responses=True,
-    )  # create Redis client with UTF-8 responses
+    )
 
 async def close_cache():
     """
     Close the Redis connection pool on shutdown to free resources.
     """
-    await redis.close()
+    if redis_client:
+        await redis_client.close()
 
 async def get_tweet_cache(tweet_id: int) -> dict | None:
     """
@@ -28,11 +29,9 @@ async def get_tweet_cache(tweet_id: int) -> dict | None:
     Returns a dict of tweet fields if present, else None.
     """
     key = f"tweet:{tweet_id}"
-    data = await redis.hgetall(key)
+    data = await redis_client.hgetall(key)
     if not data:
-        return None  # cache miss
-    # Convert string timestamps back to appropriate types if needed
-    # e.g. data["created_at"] = datetime.fromisoformat(data["created_at"]), etc.
+        return None
     return data
 
 async def set_tweet_cache(tweet) -> None:
@@ -41,20 +40,18 @@ async def set_tweet_cache(tweet) -> None:
     Called after creating or updating a tweet in the database.
     """
     key = f"tweet:{tweet.id}"
-    # Store tweet fields in a hash
-    await redis.hset(
+    await redis_client.hset(
         key,
         mapping={
             "id": str(tweet.id),
             "content": tweet.content,
-            "created_at": tweet.created_at.isoformat(),  # ISO string for ordering
+            "created_at": tweet.created_at.isoformat(),
             "updated_at": tweet.updated_at.isoformat(),
             "account_id": str(tweet.account_id),
         },
     )
-    # Score by timestamp for sorted retrieval
     score = tweet.created_at.timestamp()
-    await redis.zadd("tweets:recent", {key: score})
+    await redis_client.zadd("tweets:recent", {key: score})
 
 async def invalidate_tweet_cache(tweet_id: int) -> None:
     """
@@ -62,19 +59,18 @@ async def invalidate_tweet_cache(tweet_id: int) -> None:
     Called after deleting a tweet in the database.
     """
     key = f"tweet:{tweet_id}"
-    await redis.delete(key)
-    await redis.zrem("tweets:recent", key)
+    await redis_client.delete(key)
+    await redis_client.zrem("tweets:recent", key)
 
 async def get_recent_tweets(skip: int = 0, limit: int = 100) -> list[dict]:
     """
     Retrieve a paginated list of recent tweets from the cache.
     Falls back to DB if cache is empty (to be handled in router).
     """
-    # Get keys for the requested range (highest scores first)
-    keys = await redis.zrevrange("tweets:recent", skip, skip + limit - 1)
+    keys = await redis_client.zrevrange("tweets:recent", skip, skip + limit - 1)
     tweets = []
     for key in keys:
-        data = await redis.hgetall(key)
+        data = await redis_client.hgetall(key)
         if data:
             tweets.append(data)
     return tweets
