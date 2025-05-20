@@ -105,11 +105,15 @@ function formatDate(date) {
 }
 
 // Handle tweet textarea
-tweetContent.addEventListener('input', function() {
-    if (this.value.trim().length > 0) {
-        postTweetBtn.removeAttribute('disabled');
-    } else {
-        postTweetBtn.setAttribute('disabled', 'true');
+document.addEventListener('DOMContentLoaded', function() {
+    if (tweetContent) {
+        tweetContent.addEventListener('input', function() {
+            if (this.value.trim().length > 0) {
+                postTweetBtn.removeAttribute('disabled');
+            } else {
+                postTweetBtn.setAttribute('disabled', 'true');
+            }
+        });
     }
 });
 
