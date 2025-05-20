@@ -4,7 +4,8 @@ from typing import List
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Tweet, TweetCreate, TweetUpdate, Like
+from app.models import Tweet as TweetModel
+from app.schemas import TweetCreate, TweetUpdate, TweetOut
 from app.cache import (
     get_tweet_cache,
     set_tweet_cache,
@@ -13,6 +14,8 @@ from app.cache import (
 )
 from app.like_batcher import like_batcher
 from app.utils.auth import get_current_user
+from app.schemas import AccountCreate, AccountOut, Token
+
 
 router = APIRouter(
     prefix="/tweets",
@@ -20,58 +23,54 @@ router = APIRouter(
 )
 
 
-@router.post("/", response_model=Tweet, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=TweetOut, status_code=status.HTTP_201_CREATED)
 async def create_tweet(
     payload: TweetCreate,
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    # Persist the new tweet in the database
-    db_tweet = Tweet(content=payload.content, account_id=user.id)
+    db_tweet = TweetModel(content=payload.content, account_id=user.id)
     db.add(db_tweet)
     db.commit()
     db.refresh(db_tweet)
 
-    # Cache the newly created tweet
-    await set_tweet_cache(db_tweet)  # so next read is served from Redis
-    return db_tweet  # return full tweet including generated ID & timestamps
-
-
-@router.get("/{tweet_id}", response_model=Tweet)
-async def read_tweet(tweet_id: int, db: Session = Depends(get_db)):
-    # Try Redis cache first to reduce DB load
-    cached = await get_tweet_cache(tweet_id)
-    if cached:
-        return cached  # hit: return the hash from Redis
-
-    # Cache miss: fetch from DB
-    db_tweet = db.query(Tweet).filter(Tweet.id == tweet_id).one_or_none()
-    if not db_tweet:
-        raise HTTPException(status_code=404, detail="Tweet not found")
-
-    # Populate cache for future requests
     await set_tweet_cache(db_tweet)
     return db_tweet
 
 
-@router.put("/{tweet_id}", response_model=Tweet)
+@router.get("/{tweet_id}", response_model=TweetOut)
+async def read_tweet(tweet_id: int, db: Session = Depends(get_db)):
+    cached = await get_tweet_cache(tweet_id)
+    if cached:
+        return cached
+
+    db_tweet = db.query(TweetModel).filter(TweetModel.id == tweet_id).one_or_none()
+    if not db_tweet:
+        raise HTTPException(status_code=404, detail="Tweet not found")
+
+    await set_tweet_cache(db_tweet)
+    return db_tweet
+
+
+@router.put("/{tweet_id}", response_model=TweetOut)
 async def update_tweet(
     tweet_id: int,
     payload: TweetUpdate,
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    # Ensure tweet exists and belongs to the current user
-    db_tweet = db.query(Tweet).filter(Tweet.id == tweet_id, Tweet.account_id == user.id).one_or_none()
+    db_tweet = (
+        db.query(TweetModel)
+        .filter(TweetModel.id == tweet_id, TweetModel.account_id == user.id)
+        .one_or_none()
+    )
     if not db_tweet:
         raise HTTPException(status_code=404, detail="Tweet not found or unauthorized")
 
-    # Apply updates and commit
     db_tweet.content = payload.content
     db.commit()
     db.refresh(db_tweet)
 
-    # Update cache with new content
     await set_tweet_cache(db_tweet)
     return db_tweet
 
@@ -82,37 +81,34 @@ async def delete_tweet(
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    # Ensure tweet exists and belongs to the current user
-    db_tweet = db.query(Tweet).filter(Tweet.id == tweet_id, Tweet.account_id == user.id).one_or_none()
+    db_tweet = (
+        db.query(TweetModel)
+        .filter(TweetModel.id == tweet_id, TweetModel.account_id == user.id)
+        .one_or_none()
+    )
     if not db_tweet:
         raise HTTPException(status_code=404, detail="Tweet not found or unauthorized")
 
-    # Delete from DB
     db.delete(db_tweet)
     db.commit()
 
-    # Invalidate cache so stale data isn’t served
     await invalidate_tweet_cache(tweet_id)
-    return None  # 204 No Content has no response body
+    return None
 
 
-@router.get("/", response_model=List[Tweet])
+@router.get("/", response_model=List[TweetOut])
 async def list_recent_tweets(skip: int = 0, limit: int = 20, db: Session = Depends(get_db)):
-    # Attempt to serve from Redis sorted set
     tweets = await get_recent_tweets(skip=skip, limit=limit)
     if tweets:
-        return tweets  # hitting cache pages
+        return tweets
 
-    # Fallback: query DB, order by creation time descending
     db_tweets = (
-        db.query(Tweet)
-        .order_by(Tweet.created_at.desc())
+        db.query(TweetModel)
+        .order_by(TweetModel.created_at.desc())
         .offset(skip)
         .limit(limit)
         .all()
     )
-
-    # Cache each one for next time
     for t in db_tweets:
         await set_tweet_cache(t)
     return db_tweets
@@ -122,35 +118,26 @@ async def list_recent_tweets(skip: int = 0, limit: int = 20, db: Session = Depen
 async def like_tweet(
     tweet_id: int,
     user=Depends(get_current_user),
-    db: Session = Depends(get_db),
 ):
-    # Ensure tweet exists
-    if not db.query(Tweet).filter(Tweet.id == tweet_id).first():
-        raise HTTPException(status_code=404, detail="Tweet not found")
-
-    # Record like in-memory; DB update happens in the background batcher
     await like_batcher.add_like(tweet_id)
     return {"message": "Like queued for batch processing"}
 
 
-@router.get("/search/", response_model=List[Tweet])
+@router.get("/search/", response_model=List[TweetOut])
 async def search_tweets(
     q: str,
     skip: int = 0,
     limit: int = 20,
     db: Session = Depends(get_db),
 ):
-    # Simple substring search in DB (could be replaced/swapped with full-text)
     db_tweets = (
-        db.query(Tweet)
-        .filter(Tweet.content.ilike(f"%{q}%"))
-        .order_by(Tweet.created_at.desc())
+        db.query(TweetModel)
+        .filter(TweetModel.content.ilike(f"%{q}%"))
+        .order_by(TweetModel.created_at.desc())
         .offset(skip)
         .limit(limit)
         .all()
     )
-
-    # Cache results for quick follow-up reads
     for t in db_tweets:
         await set_tweet_cache(t)
     return db_tweets

@@ -73,5 +73,6 @@ def read_root():
     return {"message": "Welcome to the Twitter Clone API"}
 
 @app.get("/health")
-def health_check():
+def health():
     return {"status": "ok"}
+
