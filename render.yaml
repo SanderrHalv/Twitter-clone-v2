@@ -1,0 +1,32 @@
+# render.yaml
+
+services:
+  - type: web
+    name: twitter-clone-api
+    env: docker
+    plan: free
+    dockerfilePath: Dockerfile
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "30"
+
+  - type: worker
+    name: twitter-clone-like-batcher
+    env: docker
+    plan: free
+    dockerfilePath: Dockerfile
+    startCommand: >
+      uvicorn app.like_batcher_worker:app
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false

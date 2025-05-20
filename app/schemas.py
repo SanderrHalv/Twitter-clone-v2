@@ -1,34 +1,48 @@
-from pydantic import BaseModel
+# app/schemas.py
+
+from pydantic import BaseModel, EmailStr
 from datetime import datetime
+from typing import List, Optional
 
-# ----------- Account Schemas -----------
+# --- Account Schemas ---
 
-class AccountBase(BaseModel):
+class AccountCreate(BaseModel):
     username: str
-    email: str
+    email: EmailStr
+    password: str
 
-class AccountCreate(AccountBase):
-    pass
-
-class Account(AccountBase):
+class AccountOut(BaseModel):
     id: int
+    username: str
+    email: EmailStr
     created_at: datetime
 
     class Config:
         orm_mode = True
 
-# ----------- Tweet Schemas -----------
+class LoginRequest(BaseModel):
+    username: str
+    password: str
 
-class TweetBase(BaseModel):
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+# --- Tweet Schemas ---
+
+class TweetCreate(BaseModel):
     content: str
 
-class TweetCreate(TweetBase):
-    pass
+class TweetUpdate(BaseModel):
+    content: str
 
-class Tweet(TweetBase):
+class TweetOut(BaseModel):
     id: int
-    account_id: int
+    content: str
     created_at: datetime
+    updated_at: datetime
+    account_id: int
+    like_count: int
 
     class Config:
-        from_attributes = True  # This replaces orm_mode = True
+        orm_mode = True

@@ -1,14 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from datetime import timedelta
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
-from jose import jwt
+import jwt
+from datetime import timedelta, datetime
 
 from app.database import get_db
-from app.models import Account, AccountCreate, AccountOut
+from app.models import Account
+from app.schemas import AccountCreate, AccountOut, LoginRequest, Token
 from app.utils.settings import settings
-from app.utils.auth import get_current_user
-import logging
+from app.utils.auth import get_current_user  # <-- import this for `/me`
 
 router = APIRouter(
     prefix="/accounts",
@@ -17,49 +17,47 @@ router = APIRouter(
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+def get_password_hash(password: str) -> str:
+    return pwd_context.hash(password)
+
+def verify_password(plain: str, hashed: str) -> bool:
+    return pwd_context.verify(plain, hashed)
+
+def create_access_token(subject: str) -> str:
+    expire = datetime.utcnow() + timedelta(minutes=settings.access_token_expire_minutes)
+    to_encode = {"sub": subject, "exp": expire}
+    return jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
+
 @router.post("/", response_model=AccountOut, status_code=status.HTTP_201_CREATED)
 def register_account(payload: AccountCreate, db: Session = Depends(get_db)):
-    """
-    Register a new user account. Hashes password and stores user.
-    """
-    # Check for existing username or email
-    if db.query(Account).filter((Account.username == payload.username) | (Account.email == payload.email)).first():
-        logging.warning(f"Registration attempt with existing username/email: {payload.username}/{payload.email}")
+    # Check for duplicate username/email
+    exists = (
+        db.query(Account)
+        .filter((Account.username == payload.username) | (Account.email == payload.email))
+        .first()
+    )
+    if exists:
         raise HTTPException(status_code=400, detail="Username or email already registered")
 
-    hashed_pw = pwd_context.hash(payload.password)
-    db_user = Account(username=payload.username, email=payload.email, hashed_password=hashed_pw)
-    db.add(db_user)
+    user = Account(
+        username=payload.username,
+        email=payload.email,
+        hashed_password=get_password_hash(payload.password),
+    )
+    db.add(user)
     db.commit()
-    db.refresh(db_user)
+    db.refresh(user)
+    return user
 
-    logging.info(f"New user registered: {db_user.username}")
-    return db_user
-
-@router.post("/login")
-def login_account(payload: AccountCreate, db: Session = Depends(get_db)):
-    """
-    Authenticate user and return a JWT token.
-    """
+@router.post("/login", response_model=Token)
+def login_account(payload: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(Account).filter(Account.username == payload.username).first()
-    if not user or not pwd_context.verify(payload.password, user.hashed_password):
-        logging.warning(f"Failed login attempt for user: {payload.username}")
+    if not user or not verify_password(payload.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    # Create JWT token with expiry
-    access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
-    to_encode = {"sub": str(user.id)}
-    expire = settings.datetime.utcnow() + access_token_expires
-    to_encode.update({"exp": expire})
-    token = jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
-
-    logging.info(f"User logged in: {user.username}")
+    token = create_access_token(str(user.id))
     return {"access_token": token, "token_type": "bearer"}
 
 @router.get("/me", response_model=AccountOut)
-def read_current_user(user=Depends(get_current_user)):
-    """
-    Get the profile of the current authenticated user.
-    """
-    logging.debug(f"Profile viewed for user: {user.username}")
+def read_current_user(user: Account = Depends(get_current_user)):
     return user
