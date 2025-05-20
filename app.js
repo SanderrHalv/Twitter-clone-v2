@@ -1,5 +1,5 @@
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'https://twitter-clone-v2.onrender.com';
 
 async function fetchUserSuggestions() {
     try {
