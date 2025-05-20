@@ -26,3 +26,7 @@ app.mount(
     app=StaticFiles(directory=".", html=True),
     name="static",
 )
+
+# Serve static files from the "static" directory
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
