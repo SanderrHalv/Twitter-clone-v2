@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Twitter Clone</title>
-    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
     <div class="header">
@@ -122,6 +122,23 @@
         function cancelEdit(tweetId) {
             document.getElementById(`content-${tweetId}`).style.display = 'block';
             document.getElementById(`edit-form-${tweetId}`).style.display = 'none';
+        }
+
+        async function likeTweet(tweetId) {
+        try {
+            const res = await fetch(`${API_URL}/tweets/${tweetId}/like`, {
+            method: 'POST'
+            });
+            if (res.ok) {
+            const updated = await res.json();
+            document.getElementById(`like-count-${tweetId}`).textContent = updated.like_count;
+            } else {
+            alert('Failed to like tweet');
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Error liking tweet');
+        }
         }
 
         // Update a tweet via API
