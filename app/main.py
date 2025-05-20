@@ -19,7 +19,7 @@ setup_logging()
 # ----------------------------------------------------------------
 # FASTAPI APP INITIALIZATION
 # ----------------------------------------------------------------
-app = FastAPI(title="Twitter Clone API with A2 enhancements")
+app = FastAPI(title="Twitter Clone API with A2 enhancements", openapi_prefix="/api")
 
 # Compress large responses (>1KB) to save bandwidth
 app.add_middleware(GZipMiddleware, minimum_size=1000)
