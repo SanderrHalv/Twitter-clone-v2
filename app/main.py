@@ -34,8 +34,8 @@ app.add_middleware(
 )
 
 # Mount routers
-app.include_router(accounts.router)  # /accounts endpoints
-app.include_router(tweets.router)    # /tweets endpoints
+app.include_router(accounts.router, prefix="/api", tags=["accounts"])
+app.include_router(tweets.router, prefix="/api", tags=["tweets"])
 
 # ----------------------------------------------------------------
 # LIFECYCLE: STARTUP & SHUTDOWN

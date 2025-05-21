@@ -11,6 +11,7 @@ from app.utils.settings import settings
 from app.utils.auth import get_current_user  # <-- import this for `/me`
 
 router = APIRouter(
+    prefix="/accounts",
     tags=["accounts"],
 )
 

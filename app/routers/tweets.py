@@ -18,6 +18,7 @@ from app.schemas import AccountCreate, AccountOut, Token
 
 
 router = APIRouter(
+    prefix="/tweets",
     tags=["tweets"],
 )
 
