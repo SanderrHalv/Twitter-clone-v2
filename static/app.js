@@ -102,28 +102,15 @@ function logout() {
 
 async function handleLogin(e) {
   e.preventDefault();
-
-  const username = document.getElementById('login-username').value;
-  const password = document.getElementById('login-password').value;
-
-  const resp = await fetch(`${API_BASE_URL}/accounts/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ username, password }).toString(),
-  });
-
-  if (!resp.ok) {
-    alert(`Login failed (${resp.status})`);
-    return;
-  }
-
-  const data = await resp.json();
+  // ... login POST as before ...
   authToken = data.access_token;
   localStorage.setItem('twitter_clone_token', authToken);
+
+  // load user & tweets
   await getCurrentUser();
+  await fetchTweets();
+
   loginModal.style.display = 'none';
-  fetchTweets();
-  fetchUserSuggestions();
 }
 
 
@@ -153,52 +140,49 @@ async function handleRegister(e) {
 // ----------------- USER INFO -----------------
 async function getCurrentUser() {
   const token = localStorage.getItem('twitter_clone_token');
-  // No token → show login modal and bail out
   if (!token) {
     loginModal.style.display = 'block';
     return;
   }
 
   const resp = await fetch(`${API_BASE_URL}/accounts/me`, {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
+    headers: { 'Authorization': `Bearer ${token}` }
   });
 
-  // Token invalid/expired → clear it, show login modal
   if (resp.status === 401) {
     localStorage.removeItem('twitter_clone_token');
     authToken = null;
     loginModal.style.display = 'block';
     return;
   }
-
-  if (!resp.ok) {
-    throw new Error(`Failed to fetch current user: ${resp.status}`);
-  }
+  if (!resp.ok) throw new Error(`Failed to fetch current user: ${resp.status}`);
 
   const data = await resp.json();
   currentUser = data;
-
-  // Hide login modal if it’s open, then render the “logged in” UI
   loginModal.style.display = 'none';
-  // You probably have functions to update the UI; e.g.:
   renderUserProfile(currentUser);
-  fetchTweets();
-  fetchUserSuggestions();
 }
+
 
 
 // ----------------- TWEETS -----------------
 
 async function fetchTweets() {
   const resp = await fetch(`${API_BASE_URL}/tweets/`, {
-    headers: {'Authorization': `Bearer ${authToken}`}
+    headers: {
+      'Authorization': `Bearer ${authToken}`,
+      'Content-Type': 'application/json'
+    }
   });
-  if (!resp.ok) throw new Error();
+
+  if (!resp.ok) {
+    console.error('Failed to load tweets', resp.status);
+    return;
+  }
   const tweets = await resp.json();
   renderTweets(tweets);
 }
+
 
 function renderTweets(tweets) {
   if (!tweets.length) {
@@ -242,23 +226,11 @@ async function postTweet() {
 // ----------------- SUGGESTIONS -----------------
 
 async function fetchUserSuggestions() {
-  const resp = await fetch(`${API_BASE_URL}/accounts/`, {
-    headers: {'Authorization': `Bearer ${authToken}`}
-  });
-  if (!resp.ok) return;
-  const users = await resp.json();
-  renderUserSuggestions(users.filter(u => u.id !== currentUser.id).slice(0, 3));
+//
 }
 
 function renderUserSuggestions(users) {
-  followSuggestions.innerHTML = users.length
-    ? users.map(u => `
-      <div class="follow-suggestion">
-        <span>${u.username}</span>
-        <button data-user-id="${u.id}">Follow</button>
-      </div>
-    `).join('')
-    : '<p>No suggestions</p>';
+  //
 }
 
 
