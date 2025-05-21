@@ -261,19 +261,39 @@ function renderTweets(tweets) {
     tweetFeed.innerHTML = '<div class="no-tweets">No tweets yet.</div>';
     return;
   }
+
   tweetFeed.innerHTML = '';
   tweets.forEach(t => {
+    // Safely pick the author’s username:
+    // 1) t.user.username if present
+    // 2) t.username (flat field) if present
+    // 3) 'You' if it matches the current user
+    // 4) fallback to 'unknown'
+    let author = 'unknown';
+    if (t.user && t.user.username) {
+      author = t.user.username;
+    } else if (t.username) {
+      author = t.username;
+    } else if (currentUser && currentUser.username) {
+      author = currentUser.username;
+    }
+
+    // Format the timestamp (adjust if your API returns a different field)
+    const createdAt = t.created_at ? new Date(t.created_at) : new Date();
+    const timeAgo = formatDate(createdAt);
+
     const el = document.createElement('div');
     el.className = 'tweet';
     el.innerHTML = `
       <div class="tweet-header">
-        <strong>${t.user.username}</strong> @${t.user.username.toLowerCase()} · ${formatDate(new Date(t.created_at))}
+        <strong>${author}</strong> @${author.toLowerCase()} · ${timeAgo}
       </div>
       <div class="tweet-body">${t.content}</div>
     `;
     tweetFeed.appendChild(el);
   });
 }
+
 
 async function postTweet() {
   const content = tweetContent.value.trim();
