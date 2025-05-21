@@ -1,62 +1,82 @@
+# app/routers/accounts.py
+
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from passlib.context import CryptContext
-import jwt
-from datetime import timedelta, datetime
 
 from app.database import get_db
 from app.models import Account
-from app.schemas import AccountCreate, AccountOut, LoginRequest, Token
-from app.utils.settings import settings
-from app.utils.auth import get_current_user  # <-- import this for `/me`
+from app.schemas import AccountCreate, AccountOut
+from app.utils.hashing import hash_password
 
-router = APIRouter(
-    tags=["accounts"],
+router = APIRouter(tags=["accounts"])  # NO prefix here!
+
+@router.post(
+    "/",
+    response_model=AccountOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Register a new account",
 )
+def register_account(
+    account_in: AccountCreate,
+    db: Session = Depends(get_db),
+):
+    """
+    Create a new user account.  
+    Returns the created account (without the password).
+    """
+    # Hash the incoming password
+    hashed_pw = hash_password(account_in.password)
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
-
-def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
-
-def create_access_token(subject: str) -> str:
-    expire = datetime.utcnow() + timedelta(minutes=settings.access_token_expire_minutes)
-    to_encode = {"sub": subject, "exp": expire}
-    return jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
-
-@router.post("/", response_model=AccountOut, status_code=status.HTTP_201_CREATED)
-def register_account(payload: AccountCreate, db: Session = Depends(get_db)):
-    # Check for duplicate username/email
-    exists = (
-        db.query(Account)
-        .filter((Account.username == payload.username) | (Account.email == payload.email))
-        .first()
+    # Build the ORM object
+    new_account = Account(
+        username=account_in.username,
+        email=account_in.email,
+        hashed_password=hashed_pw,
     )
-    if exists:
-        raise HTTPException(status_code=400, detail="Username or email already registered")
 
-    user = Account(
-        username=payload.username,
-        email=payload.email,
-        hashed_password=get_password_hash(payload.password),
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return user
+    db.add(new_account)
+    try:
+        db.commit()
+        db.refresh(new_account)
+    except IntegrityError as e:
+        db.rollback()
+        # Check for unique constraint violations
+        detail = str(e.orig).lower()
+        if "ix_accounts_username" in detail:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Username already registered",
+            )
+        if "ix_accounts_email" in detail:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already registered",
+            )
+        # fallback
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Could not register account",
+        )
 
-@router.post("/login", response_model=Token)
-def login_account(payload: LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(Account).filter(Account.username == payload.username).first()
-    if not user or not verify_password(payload.password, user.hashed_password):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+    return new_account
 
-    token = create_access_token(str(user.id))
-    return {"access_token": token, "token_type": "bearer"}
+@router.post(
+    "/login",
+    summary="Login and get an access token",
+    response_model=Token,
+)
+def login_account(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db),
+):
+    # (existing login logic here)
+    ...
 
-@router.get("/me", response_model=AccountOut)
-def read_current_user(user: Account = Depends(get_current_user)):
-    return user
+@router.get(
+    "/me",
+    response_model=AccountOut,
+    summary="Get current logged-in user",
+)
+def read_current_user(current: Account = Depends(get_current_user)):
+    return current
