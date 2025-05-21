@@ -1,9 +1,10 @@
 # server.py
 
 import logging
+from logging.handlers import RotatingFileHandler
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
@@ -69,13 +70,49 @@ async def on_startup():
     app.state.like_batcher = like_batcher
     like_batcher.start()
     logging.info("Like-batcher started")
-    
+
 @app.on_event("shutdown")
 async def on_shutdown():
     await app.state.like_batcher.flush()
     logging.info("Like-batcher flushed")
     await close_cache()
     logging.info("Cache closed")
+
+# ─── file logging ─────────────────────────────────────────────────
+log_file = "app.log"
+file_handler = RotatingFileHandler(
+    filename=log_file,
+    maxBytes=5 * 1024 * 1024,  # 5 MB
+    backupCount=2,             # keep up to 2 old files
+)
+file_handler.setLevel(logging.INFO)
+file_formatter = logging.Formatter(
+    "%(asctime)s %(levelname)s %(name)s %(message)s"
+)
+file_handler.setFormatter(file_formatter)
+# attach to root logger
+logging.getLogger().addHandler(file_handler)
+
+# ─── Request logging middleware ──────────────────────────────────────────────
+@app.middleware("http")
+async def log_requests(request, call_next):
+    logger = logging.getLogger("requests")
+    logger.info(f"Received {request.method} {request.url.path}")
+    response = await call_next(request)
+    logger.info(f"Responded {response.status_code} to {request.method} {request.url.path}")
+    return response
+
+# ─── Logs endpoint ───────────────────────────────────────────────────────────
+@app.get("/logs", response_class=PlainTextResponse, summary="Fetch the application log")
+def get_logs():
+    """
+    Returns the contents of the application log file.
+    """
+    try:
+        with open(log_file, "r") as f:
+            return f.read()
+    except FileNotFoundError:
+        return "Log file not found.\n"
 
 # Serve frontend
 app.mount("/static", StaticFiles(directory="static"), name="static")
