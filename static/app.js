@@ -121,9 +121,9 @@ async function handleLogin(e) {
   const data = await resp.json();
   authToken = data.access_token;
   localStorage.setItem('twitter_clone_token', authToken);
+  await getCurrentUser();
 
   loginModal.style.display = 'none';
-  await getCurrentUser();
   fetchTweets();
   fetchUserSuggestions();
 }
@@ -154,19 +154,38 @@ async function handleRegister(e) {
 // ----------------- USER INFO -----------------
 
 async function getCurrentUser() {
+  const token = localStorage.getItem('twitter_clone_token');
+  if (!token) {
+    // no token stored; make UI reflect logged-out state
+    currentUser = null;
+    showLoggedOutUI();
+    return;
+  }
+
   const resp = await fetch(`${API_BASE_URL}/accounts/me`, {
-    headers: {'Authorization': `Bearer ${authToken}`}
+    headers: {
+      // attach the JWT so the backend can verify identity
+      'Authorization': `Bearer ${token}`
+    }
   });
-  if (!resp.ok) throw new Error();
-  currentUser = await resp.json();
-  sidebarUserInfo.innerHTML = `
-    <img src="/api/placeholder/40/40" alt="${currentUser.username}">
-    <div class="user-details">
-      <span>${currentUser.username}</span>
-      <span>@${currentUser.username.toLowerCase()}</span>
-    </div>
-  `;
+
+  if (resp.status === 401) {
+    // token expired or invalid—clear it and treat as logged out
+    localStorage.removeItem('twitter_clone_token');
+    currentUser = null;
+    showLoggedOutUI();
+    return;
+  }
+
+  if (!resp.ok) {
+    throw new Error(`Failed to fetch current user: ${resp.status}`);
+  }
+
+  const data = await resp.json();
+  currentUser = data;
+  showLoggedInUI(data);
 }
+
 
 
 // ----------------- TWEETS -----------------
