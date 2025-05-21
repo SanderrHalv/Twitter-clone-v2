@@ -227,7 +227,6 @@ function renderUserProfile(user) {
 // ----------------- TWEETS -----------------
 
 async function fetchTweets() {
-  console.log("Fetching tweets...");
   try {
     const resp = await fetch(`${API_BASE_URL}/tweets/`, {
       headers: {
@@ -288,6 +287,7 @@ function renderTweets(tweets) {
       <div class="tweet-header">
         <strong>${author}</strong> @${author.toLowerCase()} · ${timeAgo}
       </div>
+      <br>
       <div class="tweet-body">${t.content}</div>
     `;
     tweetFeed.appendChild(el);
@@ -322,12 +322,9 @@ async function checkApiEndpoints() {
   console.log("Checking API endpoints...");
   
   try {
-    // Check health endpoint
     const healthResp = await fetch(`${window.location.origin}/health`);
     console.log(`Health endpoint: ${healthResp.status}`);
-    
-    // Check API base URL
-    console.log(`Using API base URL: ${API_BASE_URL}`);
+
   } catch (error) {
     console.error("Error checking endpoints:", error);
   }
@@ -343,3 +340,24 @@ function formatDate(d) {
   if (diff < 86400) return `${Math.floor(diff/3600)}h`;
   return d.toLocaleDateString();
 }
+
+// ----------------- LIKE -----------------
+
+async function handleLike(button) {
+  const tweetId = button.dataset.id;
+  const liked   = button.textContent.includes("❤️");
+  const method  = liked ? "DELETE" : "POST";
+  const url     = `${API_BASE_URL}/tweets/${tweetId}/like`;
+
+  const resp = await fetch(url, {
+    method,
+    headers: { 'Authorization': `Bearer ${authToken}` }
+  });
+  if (!resp.ok) {
+    alert(`Error ${liked ? "unliking" : "liking"} tweet (${resp.status})`);
+    return;
+  }
+  // refresh the tweets (or update this one tweet in place)
+  await fetchTweets();
+}
+

@@ -40,9 +40,9 @@ class TweetOut(BaseModel):
     id: int
     content: str
     created_at: datetime
-    updated_at: datetime
-    account_id: int
+    username: str
     like_count: int
+    liked_by_user: bool
 
     class Config:
         orm_mode = True
