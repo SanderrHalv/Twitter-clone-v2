@@ -36,28 +36,40 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def on_startup():
-    # 1) Schema migration: add user_id only if missing
-    logging.info("Running schema migration: ensuring tweets.user_id exists")
+    from sqlalchemy import text
+    from app.database import engine, Base
+
+    # ─── Schema migrations ─────────────────────────────────────────────────────
+    logging.info("Running schema migrations…")
     with engine.begin() as conn:
+        # add tweets.user_id if missing
         conn.execute(text(
             "ALTER TABLE tweets "
             "ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES accounts(id);"
         ))
-    logging.info("Schema migration complete")
+        # add likes.user_id if missing
+        conn.execute(text(
+            "ALTER TABLE likes "
+            "ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES accounts(id);"
+        ))
+        # add likes.tweet_id if missing (unlikely, but safe)
+        conn.execute(text(
+            "ALTER TABLE likes "
+            "ADD COLUMN IF NOT EXISTS tweet_id INTEGER REFERENCES tweets(id);"
+        ))
+    logging.info("Schema migrations complete")
 
-    # 2) Create any missing tables (likes, etc.)
+    # ─── Create any new tables ────────────────────────────────────────────────
     Base.metadata.create_all(bind=engine)
     logging.info("DB tables ready (migrated)")
 
-    # 3) Init cache
+    # ─── Cache & background tasks ─────────────────────────────────────────────
     await init_cache()
     logging.info("Cache ready")
-
-    # 4) Start like batcher
     app.state.like_batcher = like_batcher
     like_batcher.start()
     logging.info("Like-batcher started")
-
+    
 @app.on_event("shutdown")
 async def on_shutdown():
     await app.state.like_batcher.flush()
