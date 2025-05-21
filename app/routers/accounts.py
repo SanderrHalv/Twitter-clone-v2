@@ -8,6 +8,7 @@ from app.database import get_db
 from app.models import Account
 from app.schemas import AccountCreate, AccountOut, Token
 from app.utils.auth import get_current_user
+from typing import List
 
 router = APIRouter(tags=["accounts"])  # no internal prefix
 
@@ -76,5 +77,18 @@ def login_account(
     response_model=AccountOut,
     summary="Get current logged-in user",
 )
+
+@router.get(
+    "/",
+    response_model=List[AccountOut],
+    summary="List all user accounts",
+)
+def list_accounts(
+    db: Session = Depends(get_db),
+):
+    """
+    Return every account (for admin/testing).
+    """
+    return db.query(Account).order_by(Account.created_at.desc()).all()
 def read_current_user(current: Account = Depends(get_current_user)):
     return current
