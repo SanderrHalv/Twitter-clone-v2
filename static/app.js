@@ -105,11 +105,15 @@ async function handleLogin(e) {
   const username = document.getElementById('login-username').value;
   const password = document.getElementById('login-password').value;
 
-  const resp = await fetch(`${API_BASE_URL}/accounts/`, {
-    method:  'POST',
-    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-    body:    `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`
+  const resp = await fetch(`${API_BASE_URL}/accounts/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      username: username,
+      password: password
+    }).toString(),
   });
+
   if (!resp.ok) {
     alert('Login failed');
     return;
