@@ -94,6 +94,7 @@ function renderTweets(tweets) {
       <div class="tweet-header">
         <strong>${author}</strong> · ${timeAgo}
       </div>
+      <br />
       <div class="tweet-body">${t.content}</div>
       <div class="tweet-actions">
         <button class="like-btn" data-id="${t.id}">
