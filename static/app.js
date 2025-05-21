@@ -101,23 +101,23 @@ function logout() {
 // ----------------- AUTH -----------------
 
 async function handleLogin(e) {
-  e.preventDefault();
+  e.preventDefault();  // stops the browser from actually submitting the form
+
   const username = document.getElementById('login-username').value;
   const password = document.getElementById('login-password').value;
 
+  // Send form-encoded data to match FastAPI form parameters
   const resp = await fetch(`${API_BASE_URL}/accounts/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      username: username,
-      password: password
-    }).toString(),
+    body: new URLSearchParams({ username, password }).toString(),
   });
 
   if (!resp.ok) {
     alert('Login failed');
     return;
   }
+
   const data = await resp.json();
   authToken = data.access_token;
   localStorage.setItem('twitter_clone_token', authToken);
@@ -127,6 +127,7 @@ async function handleLogin(e) {
   fetchTweets();
   fetchUserSuggestions();
 }
+
 
 async function handleRegister(e) {
   e.preventDefault();
