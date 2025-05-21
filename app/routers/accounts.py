@@ -66,17 +66,18 @@ def login_account(
     db: Session = Depends(get_db),
 ):
     """
-    Simple login form that only asks for username & password.
-    Returns a JWT token (stubbed until implemented).
+    Simple login that returns a consistent token for development.
     """
     account = db.query(Account).filter_by(username=username).first()
+    
     if not account or account.hashed_password != password:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
         )
-    # TODO: generate a real JWT token here
-    return {"access_token": "FAKE_TOKEN", "token_type": "bearer"}
+    
+    # Return a consistent token for development
+    return {"access_token": "dev_token_123", "token_type": "bearer"}
 
 @router.get(
     "/me",

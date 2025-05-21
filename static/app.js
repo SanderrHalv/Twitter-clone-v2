@@ -9,7 +9,6 @@ let tweetFeed,
     tweetContent,
     postTweetBtn,
     sidebarUserInfo,
-    followSuggestions,
     loginModal,
     registerModal,
     loginForm,
@@ -21,7 +20,6 @@ document.addEventListener('DOMContentLoaded', () => {
   tweetContent      = document.getElementById('tweet-content');
   postTweetBtn      = document.getElementById('post-tweet-btn');
   sidebarUserInfo   = document.getElementById('sidebar-user-info');
-  followSuggestions = document.getElementById('follow-suggestions');
   loginModal        = document.getElementById('login-modal');
   registerModal     = document.getElementById('register-modal');
   loginForm         = document.getElementById('login-form');
@@ -73,15 +71,23 @@ document.addEventListener('DOMContentLoaded', () => {
 // ----------------- CORE APP FLOW -----------------
 
 async function initApp() {
+  console.log("Initializing app...");
+  await checkApiEndpoints();
+  
+  authToken = localStorage.getItem('twitter_clone_token');
+  
   if (authToken) {
+    console.log("Token found, trying to get current user");
     try {
       await getCurrentUser();
-      fetchTweets();
-      fetchUserSuggestions();
-    } catch {
+      console.log("Fetching tweets...");
+      await fetchTweets();
+    } catch (error) {
+      console.error("Error during init:", error);
       showAuthModal();
     }
   } else {
+    console.log("No token found, showing auth modal");
     showAuthModal();
   }
 }
@@ -161,48 +167,79 @@ async function handleRegister(e) {
 
 // ----------------- USER INFO -----------------
 async function getCurrentUser() {
+  console.log("Getting current user...");
   const token = localStorage.getItem('twitter_clone_token');
+  
   if (!token) {
-    loginModal.style.display = 'block';
+    console.log("No token found, showing login modal");
+    loginModal.style.display = 'flex';
     return;
   }
 
-  const resp = await fetch(`${API_BASE_URL}/accounts/me`, {
-    headers: { 'Authorization': `Bearer ${token}` }
-  });
+  try {
+    console.log("Sending request to /api/accounts/me");
+    const resp = await fetch(`${API_BASE_URL}/accounts/me`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
 
-  if (resp.status === 401) {
+    console.log(`/accounts/me response status: ${resp.status}`);
+    
+    if (resp.status === 401) {
+      console.log("401 Unauthorized, clearing token");
+      localStorage.removeItem('twitter_clone_token');
+      authToken = null;
+      loginModal.style.display = 'flex';
+      return;
+    }
+    
+    if (!resp.ok) {
+      console.error(`Failed to fetch user: ${resp.status}`);
+      throw new Error(`Failed to fetch user: ${resp.status}`);
+    }
+
+    const data = await resp.json();
+    console.log("User data received:", data);
+    currentUser = data;
+    loginModal.style.display = 'none';
+    renderUserProfile(currentUser);
+  } catch (error) {
+    console.error("Error getting current user:", error);
     localStorage.removeItem('twitter_clone_token');
     authToken = null;
-    loginModal.style.display = 'block';
-    return;
+    loginModal.style.display = 'flex';
   }
-  if (!resp.ok) throw new Error(`Failed to fetch current user: ${resp.status}`);
-
-  const data = await resp.json();
-  currentUser = data;
-  loginModal.style.display = 'none';
-  renderUserProfile(currentUser);
 }
-
 
 
 // ----------------- TWEETS -----------------
 
 async function fetchTweets() {
-  const resp = await fetch(`${API_BASE_URL}/tweets/`, {
-    headers: {
-      'Authorization': `Bearer ${authToken}`,
-      'Content-Type': 'application/json'
-    }
-  });
+  console.log("Fetching tweets...");
+  try {
+    const resp = await fetch(`${API_BASE_URL}/tweets/`, {
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
 
-  if (!resp.ok) {
-    console.error('Failed to load tweets', resp.status);
-    return;
+    console.log(`Tweets response status: ${resp.status}`);
+    
+    if (!resp.ok) {
+      console.error('Failed to load tweets', resp.status);
+      if (resp.status === 401) {
+        // Authentication error, show login
+        showAuthModal();
+      }
+      return;
+    }
+    
+    const tweets = await resp.json();
+    console.log(`Received ${tweets.length} tweets`);
+    renderTweets(tweets);
+  } catch (error) {
+    console.error('Error fetching tweets:', error);
   }
-  const tweets = await resp.json();
-  renderTweets(tweets);
 }
 
 
@@ -245,14 +282,22 @@ async function postTweet() {
 }
 
 
-// ----------------- SUGGESTIONS -----------------
+// ----------------- DEBUG -----------------
 
-async function fetchUserSuggestions() {
-//
-}
-
-function renderUserSuggestions(users) {
-  //
+// Debug function to check API endpoint availability
+async function checkApiEndpoints() {
+  console.log("Checking API endpoints...");
+  
+  try {
+    // Check health endpoint
+    const healthResp = await fetch(`${window.location.origin}/health`);
+    console.log(`Health endpoint: ${healthResp.status}`);
+    
+    // Check API base URL
+    console.log(`Using API base URL: ${API_BASE_URL}`);
+  } catch (error) {
+    console.error("Error checking endpoints:", error);
+  }
 }
 
 
