@@ -256,43 +256,35 @@ async function fetchTweets() {
 
 
 function renderTweets(tweets) {
-  if (!tweets.length) {
-    tweetFeed.innerHTML = '<div class="no-tweets">No tweets yet.</div>';
-    return;
-  }
-
-  tweetFeed.innerHTML = '';
+  tweetFeed.innerHTML = "";
   tweets.forEach(t => {
-    // Safely pick the author’s username:
-    // 1) t.user.username if present
-    // 2) t.username (flat field) if present
-    // 3) 'You' if it matches the current user
-    // 4) fallback to 'unknown'
-    let author = 'unknown';
-    if (t.user && t.user.username) {
-      author = t.user.username;
-    } else if (t.username) {
-      author = t.username;
-    } else if (currentUser && currentUser.username) {
-      author = currentUser.username;
-    }
+    const author    = t.username;
+    const timeAgo   = formatDate(new Date(t.created_at));
+    const liked     = t.liked_by_user;
+    const count     = t.like_count;
 
-    // Format the timestamp (adjust if your API returns a different field)
-    const createdAt = t.created_at ? new Date(t.created_at) : new Date();
-    const timeAgo = formatDate(createdAt);
-
-    const el = document.createElement('div');
-    el.className = 'tweet';
+    const el = document.createElement("div");
+    el.className = "tweet";
     el.innerHTML = `
       <div class="tweet-header">
-        <strong>${author}</strong> @${author.toLowerCase()} · ${timeAgo}
+        <strong>${author}</strong> · ${timeAgo}
       </div>
-      <br>
       <div class="tweet-body">${t.content}</div>
+      <div class="tweet-actions">
+        <button class="like-btn" data-id="${t.id}">
+          ${liked ? "❤️" : "🤍"} <span class="like-count">${count}</span>
+        </button>
+      </div>
     `;
     tweetFeed.appendChild(el);
   });
+
+  // wire up all like buttons
+  document.querySelectorAll(".like-btn").forEach(btn => {
+    btn.addEventListener("click", () => handleLike(btn));
+  });
 }
+
 
 
 async function postTweet() {
