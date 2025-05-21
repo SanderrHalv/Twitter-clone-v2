@@ -6,8 +6,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from sqlalchemy import text
 
-from app.database import engine             # for metadata.create_all
+from app.database import engine, Base             # for metadata.create_all
 from app import models                      # registers ORM models
 from app.routers import accounts, tweets
 from app.cache import init_cache, close_cache
@@ -38,28 +39,24 @@ app.add_middleware(
 # 4) Startup / Shutdown hooks
 @app.on_event("startup")
 async def on_startup():
-    # ensure tables exist
-    models.Base.metadata.create_all(bind=engine)
-    logging.info("DB tables ready")
+    with engine.begin() as conn:
+        conn.execute(text(
+            "ALTER TABLE tweets "
+            "ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES accounts(id);"
+        ))
 
-    # init Redis
+    # create any new tables (likes, etc.) without dropping existing ones
+    Base.metadata.create_all(bind=engine)
+    logging.info("DB tables ready (migrated)")
+
+    # init Redis cache
     await init_cache()
     logging.info("Cache ready")
 
-    # start like-batcher background thread/task
+    # start the like‐batcher
     app.state.like_batcher = like_batcher
     like_batcher.start()
-    logging.info("Like-batcher started")
-
-@app.on_event("shutdown")
-async def on_shutdown():
-    # flush pending likes
-    await app.state.like_batcher.flush()
-    logging.info("Likes flushed")
-
-    # close cache
-    await close_cache()
-    logging.info("Cache closed")
+    logging.info("Like‐batcher started")
 
 # 5) Static / Frontend
 app.mount("/static", StaticFiles(directory="static"), name="static")
