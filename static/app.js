@@ -94,7 +94,6 @@ function renderTweets(tweets) {
       <div class="tweet-header">
         <strong>${author}</strong> · ${timeAgo}
       </div>
-      <br />
       <div class="tweet-body">${t.content}</div>
       <div class="tweet-actions">
         <button class="like-btn" data-id="${t.id}">
@@ -154,7 +153,7 @@ function formatDate(d) {
 
 async function handleLike(button) {
   const tweetId = button.dataset.id;
-  const liked   = button.textContent.includes("❤️");
+  const liked   = true;
   const method  = liked ? "DELETE" : "POST";
   const url     = `${API_BASE_URL}/tweets/${tweetId}/like`;
 
