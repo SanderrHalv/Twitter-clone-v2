@@ -26,11 +26,15 @@ def list_tweets(
 
     result = []
     for t in raw_tweets:
+        # Lookup the author’s username via the Account model
+        author = db.query(Account).get(t.user_id)
+        username = author.username if author else "unknown"
+
         result.append({
             "id": t.id,
             "content": t.content,
             "created_at": t.created_at,
-            "username": t.user.username,
+            "username": username,
             "like_count": len(t.likes),
             "liked_by_user": any(l.user_id == current.id for l in t.likes),
         })
