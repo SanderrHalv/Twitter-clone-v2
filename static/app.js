@@ -151,28 +151,25 @@ async function handleRegister(e) {
 
 
 // ----------------- USER INFO -----------------
-
 async function getCurrentUser() {
   const token = localStorage.getItem('twitter_clone_token');
+  // No token → show login modal and bail out
   if (!token) {
-    // no token stored; make UI reflect logged-out state
-    currentUser = null;
-    showLoggedOutUI();
+    loginModal.style.display = 'block';
     return;
   }
 
   const resp = await fetch(`${API_BASE_URL}/accounts/me`, {
     headers: {
-      // attach the JWT so the backend can verify identity
-      'Authorization': `Bearer ${token}`
-    }
+      'Authorization': `Bearer ${token}`,
+    },
   });
 
+  // Token invalid/expired → clear it, show login modal
   if (resp.status === 401) {
-    // token expired or invalid—clear it and treat as logged out
     localStorage.removeItem('twitter_clone_token');
-    currentUser = null;
-    showLoggedOutUI();
+    authToken = null;
+    loginModal.style.display = 'block';
     return;
   }
 
@@ -182,9 +179,14 @@ async function getCurrentUser() {
 
   const data = await resp.json();
   currentUser = data;
-  showLoggedInUI(data);
-}
 
+  // Hide login modal if it’s open, then render the “logged in” UI
+  loginModal.style.display = 'none';
+  // You probably have functions to update the UI; e.g.:
+  renderUserProfile(currentUser);
+  fetchTweets();
+  fetchUserSuggestions();
+}
 
 
 // ----------------- TWEETS -----------------
