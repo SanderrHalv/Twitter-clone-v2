@@ -1,8 +1,9 @@
 # app/schemas.py
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, ConfigDict
 from datetime import datetime
 from typing import List, Optional
+
 
 # --- Account Schemas ---
 
@@ -44,5 +45,4 @@ class TweetOut(BaseModel):
     like_count: int
     liked_by_user: bool
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
