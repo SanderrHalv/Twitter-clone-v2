@@ -1,7 +1,6 @@
 # app/routers/accounts.py
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi import APIRouter, Depends, HTTPException, status, Form
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -10,8 +9,7 @@ from app.models import Account
 from app.schemas import AccountCreate, AccountOut, Token
 from app.utils.auth import get_current_user
 
-# Router without internal prefix
-router = APIRouter(tags=["accounts"])
+router = APIRouter(tags=["accounts"])  # no internal prefix
 
 @router.post(
     "/",
@@ -24,14 +22,13 @@ def register_account(
     db: Session = Depends(get_db),
 ):
     """
-    Create a new user account. Password is stored as-is (no hashing).
+    Create a new user account. Password is stored as plain text.
     Returns the created account (without password field).
     """
-    # Build the ORM object using raw password
     new_account = Account(
         username=account_in.username,
         email=account_in.email,
-        hashed_password=account_in.password,  # storing as plain text
+        hashed_password=account_in.password,  # storing raw password
     )
 
     db.add(new_account)
@@ -60,19 +57,26 @@ def register_account(
 
 @router.post(
     "/login",
-    summary="Login and get an access token",
     response_model=Token,
+    summary="Login and get an access token",
 )
 def login_account(
     username: str = Form(...),
     password: str = Form(...),
     db: Session = Depends(get_db),
 ):
-    # TODO: implement authentication logic (password check, JWT token creation)
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Login not implemented",
-    )
+    """
+    Simple login form that only asks for username & password.
+    Returns a JWT token (stubbed until implemented).
+    """
+    account = db.query(Account).filter_by(username=username).first()
+    if not account or account.hashed_password != password:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials",
+        )
+    # TODO: generate a real JWT token here
+    return {"access_token": "FAKE_TOKEN", "token_type": "bearer"}
 
 @router.get(
     "/me",
