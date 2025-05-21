@@ -66,18 +66,10 @@ def login_account(
     db: Session = Depends(get_db),
 ):
     """
-    Simple login that returns a consistent token for development.
+    Simplified login.
     """
-    account = db.query(Account).filter_by(username=username).first()
-    
-    if not account or account.hashed_password != password:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials",
-        )
-    
-    # Return a consistent token for development
-    return {"access_token": "dev_token_123", "token_type": "bearer"}
+    # Always return a valid token, ignoring credentials
+    return {"access_token": "simplified_token", "token_type": "bearer"}
 
 @router.get(
     "/me",
