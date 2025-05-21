@@ -210,6 +210,19 @@ async function getCurrentUser() {
   }
 }
 
+function renderUserProfile(user) {
+  sidebarUserInfo.innerHTML = `
+    <div class="user-info">
+      <strong>${user.username}</strong>
+      <button id="logout-btn">Logout</button>
+    </div>
+  `;
+  // wire up the logout button
+  document.getElementById('logout-btn').addEventListener('click', () => {
+    if (confirm('Do you want to logout?')) logout();
+  });
+}
+
 
 // ----------------- TWEETS -----------------
 
