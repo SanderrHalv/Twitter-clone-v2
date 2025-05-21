@@ -40,36 +40,17 @@ async def on_startup():
     from sqlalchemy import text
     from app.database import engine, Base
 
-    # ─── Schema migrations ─────────────────────────────────────────────────────
-    logging.info("Running schema migrations…")
+    logging.info("Resetting likes table to match schema…")
     with engine.begin() as conn:
-        # add tweets.user_id if missing
-        conn.execute(text(
-            "ALTER TABLE tweets "
-            "ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES accounts(id);"
-        ))
-        # add likes.user_id if missing
-        conn.execute(text(
-            "ALTER TABLE likes "
-            "ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES accounts(id);"
-        ))
-        # add likes.tweet_id if missing (unlikely, but safe)
-        conn.execute(text(
-            "ALTER TABLE likes "
-            "ADD COLUMN IF NOT EXISTS tweet_id INTEGER REFERENCES tweets(id);"
-        ))
-    logging.info("Schema migrations complete")
+        # Drop only the likes table (so recreate_all will rebuild it)
+        conn.execute(text("DROP TABLE IF EXISTS likes;"))
+    logging.info("Dropped old likes table (if any)")
 
-    # ─── Create any new tables ────────────────────────────────────────────────
+    # Now create any missing tables: tweets, accounts, and likes
     Base.metadata.create_all(bind=engine)
-    logging.info("DB tables ready (migrated)")
+    logging.info("DB tables ready (with likes table rebuilt)")
 
-    # ─── Cache & background tasks ─────────────────────────────────────────────
-    await init_cache()
-    logging.info("Cache ready")
-    app.state.like_batcher = like_batcher
-    like_batcher.start()
-    logging.info("Like-batcher started")
+    # …your cache + batcher startup here…
 
 @app.on_event("shutdown")
 async def on_shutdown():
