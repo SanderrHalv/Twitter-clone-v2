@@ -33,10 +33,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount routers
-app.include_router(accounts.router, prefix="/api", tags=["accounts"])
-app.include_router(tweets.router, prefix="/api", tags=["tweets"])
-
 # ----------------------------------------------------------------
 # LIFECYCLE: STARTUP & SHUTDOWN
 # ----------------------------------------------------------------
