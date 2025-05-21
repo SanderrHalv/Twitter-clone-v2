@@ -64,7 +64,8 @@ def register_account(
     response_model=Token,
 )
 def login_account(
-    form_data: OAuth2PasswordRequestForm = Depends(),
+    username: str = Form(...),
+    password: str = Form(...),
     db: Session = Depends(get_db),
 ):
     # TODO: implement authentication logic (password check, JWT token creation)
