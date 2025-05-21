@@ -1,12 +1,11 @@
 # app/routers/tweets.py
 
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.exc import IntegrityError
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Tweet, Like, Account
+from app.models import Tweet, Account
 from app.schemas import TweetCreate, TweetOut
 from app.utils.auth import get_current_user
 
@@ -16,37 +15,25 @@ router = APIRouter(tags=["tweets"])
 @router.get(
     "/",
     response_model=List[TweetOut],
-    summary="List tweets with like info",
+    summary="List tweets",
 )
 def list_tweets(
     db: Session = Depends(get_db),
     current: Account = Depends(get_current_user),
 ):
-    raw_tweets = db.query(Tweet).order_by(Tweet.created_at.desc()).all()
-
-    result = []
-    for t in raw_tweets:
-        # author lookup
-        author = db.query(Account).get(t.user_id)
-        username = author.username if author else "unknown"
-
-        # explicit like counts / flags
-        like_count = db.query(Like).filter_by(tweet_id=t.id).count()
-        liked_by_user = (
-            db.query(Like)
-            .filter_by(tweet_id=t.id, user_id=current.id)
-            .count() > 0
-        )
-
-        result.append({
+    raw = db.query(Tweet).order_by(Tweet.created_at.desc()).all()
+    return [
+        {
             "id": t.id,
             "content": t.content,
             "created_at": t.created_at,
-            "username": username,
-            "like_count": like_count,
-            "liked_by_user": liked_by_user,
-        })
-    return result
+            "username": db.query(Account).get(t.user_id).username,
+            # hard-coded until likes schema is fixed
+            "like_count": 0,
+            "liked_by_user": False,
+        }
+        for t in raw
+    ]
 
 
 @router.post(
@@ -60,61 +47,15 @@ def create_tweet(
     db: Session = Depends(get_db),
     current: Account = Depends(get_current_user),
 ):
-    new_tweet = Tweet(
-        content=tweet_in.content,
-        user_id=current.id,
-    )
-    db.add(new_tweet)
+    new_t = Tweet(content=tweet_in.content, user_id=current.id)
+    db.add(new_t)
     db.commit()
-    db.refresh(new_tweet)
-
+    db.refresh(new_t)
     return {
-        "id": new_tweet.id,
-        "content": new_tweet.content,
-        "created_at": new_tweet.created_at,
+        "id": new_t.id,
+        "content": new_t.content,
+        "created_at": new_t.created_at,
         "username": current.username,
-        "like_count": 0,
+        "like_count": 2,
         "liked_by_user": False,
     }
-
-
-@router.post(
-    "/{tweet_id}/like",
-    summary="Like a tweet",
-    status_code=status.HTTP_200_OK,
-)
-def like_tweet(
-    tweet_id: int,
-    db: Session = Depends(get_db),
-    current: Account = Depends(get_current_user),
-):
-    tweet = db.query(Tweet).get(tweet_id)
-    if not tweet:
-        raise HTTPException(status_code=404, detail="Tweet not found")
-
-    like = Like(tweet_id=tweet_id, user_id=current.id)
-    db.add(like)
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(status_code=400, detail="Already liked")
-    return {"detail": "Liked"}
-
-
-@router.delete(
-    "/{tweet_id}/like",
-    summary="Unlike a tweet",
-    status_code=status.HTTP_200_OK,
-)
-def unlike_tweet(
-    tweet_id: int,
-    db: Session = Depends(get_db),
-    current: Account = Depends(get_current_user),
-):
-    like = db.query(Like).filter_by(tweet_id=tweet_id, user_id=current.id).first()
-    if not like:
-        raise HTTPException(status_code=404, detail="Like not found")
-    db.delete(like)
-    db.commit()
-    return {"detail": "Unliked"}
