@@ -57,7 +57,7 @@ function renderUserProfile(user) {
 async function fetchTweets() {
   try {
     console.log("Fetching tweets...");
-    const resp = await fetch(`${API_BASE_URL}/tweets/`, {
+    const resp = await fetch(`${API_BASE_URL}/tweets`, {
       headers: {
         'Authorization': `Bearer ${authToken}`,
         'Content-Type': 'application/json'
