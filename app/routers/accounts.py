@@ -1,15 +1,17 @@
 # app/routers/accounts.py
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Account
-from app.schemas import AccountCreate, AccountOut
-from app.utils.hashing import hash_password
+from app.schemas import AccountCreate, AccountOut, Token
+from app.utils.auth import get_current_user
 
-router = APIRouter(tags=["accounts"])  # NO prefix here!
+# Router without internal prefix
+router = APIRouter(tags=["accounts"])
 
 @router.post(
     "/",
@@ -22,17 +24,14 @@ def register_account(
     db: Session = Depends(get_db),
 ):
     """
-    Create a new user account.  
-    Returns the created account (without the password).
+    Create a new user account. Password is stored as-is (no hashing).
+    Returns the created account (without password field).
     """
-    # Hash the incoming password
-    hashed_pw = hash_password(account_in.password)
-
-    # Build the ORM object
+    # Build the ORM object using raw password
     new_account = Account(
         username=account_in.username,
         email=account_in.email,
-        hashed_password=hashed_pw,
+        hashed_password=account_in.password,  # storing as plain text
     )
 
     db.add(new_account)
@@ -41,7 +40,6 @@ def register_account(
         db.refresh(new_account)
     except IntegrityError as e:
         db.rollback()
-        # Check for unique constraint violations
         detail = str(e.orig).lower()
         if "ix_accounts_username" in detail:
             raise HTTPException(
@@ -53,7 +51,6 @@ def register_account(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Email already registered",
             )
-        # fallback
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Could not register account",
@@ -70,8 +67,11 @@ def login_account(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ):
-    # (existing login logic here)
-    ...
+    # TODO: implement authentication logic (password check, JWT token creation)
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail="Login not implemented",
+    )
 
 @router.get(
     "/me",
