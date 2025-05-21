@@ -101,17 +101,39 @@ function logout() {
 // ----------------- AUTH -----------------
 
 async function handleLogin(e) {
-  e.preventDefault();
-  // ... login POST as before ...
+  e.preventDefault();  // stop the native form submit
+
+  const username = document.getElementById('login-username').value;
+  const password = document.getElementById('login-password').value;
+
+  // 1) Send the form-encoded login request
+  const resp = await fetch(`${API_BASE_URL}/accounts/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ username, password }).toString(),
+  });
+
+  // 2) If login failed, bail out
+  if (!resp.ok) {
+    alert(`Login failed (${resp.status})`);
+    return;
+  }
+
+  // 3) Parse the JSON _into_ `data` before using it
+  const data = await resp.json();
+
+  // 4) Store the token
   authToken = data.access_token;
   localStorage.setItem('twitter_clone_token', authToken);
 
-  // load user & tweets
+  // 5) Fetch the current user & tweets
   await getCurrentUser();
   await fetchTweets();
 
+  // 6) Hide the login modal
   loginModal.style.display = 'none';
 }
+
 
 
 
