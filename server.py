@@ -16,5 +16,5 @@ async def root():
     return FileResponse("static/index.html")
 
 from app.routers import accounts, tweets
-app.include_router(accounts.router, prefix="/api/accounts", tags=["accounts"])
-app.include_router(tweets.router, prefix="/api/tweets", tags=["tweets"])
+app.include_router(accounts.router, prefix="/accounts", tags=["accounts"])
+app.include_router(tweets.router, prefix="/tweets", tags=["tweets"])
